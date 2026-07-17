@@ -239,17 +239,21 @@ def build_blend_fcurves(action, armature, bone_name, fps, positions, rotations, 
     
     q_rotations = {k: Quaternion([v[3], v[0], v[1], v[2]]) for k, v in rotations.items()}
 
-    b_positions, b_rotations, b_scales = parent_to_bind_blend(bpy_bone, positions.values(), q_rotations.values(), scales.values(), GFS_MODEL_TRANSFORMS)
+    # Issue #157: Blend Animation rotations are additive Euler-angle offsets,
+    # not proper rotations, so `parent_to_bind_rotation_blend` now returns
+    # Euler triples directly instead of Quaternions - see RotationBlend.py.
+    # The old quaternion-sign-fixing steps (`fix_quaternion_signs` /
+    # `align_quaternion_signs`) no longer apply to this data; instead, keep
+    # the Euler curve continuous across keyframes the same way the Base
+    # Animation path does, since Euler decomposition is only defined modulo
+    # 2*pi per component.
+    b_positions, e_rotations, b_scales = parent_to_bind_blend(bpy_bone, positions.values(), q_rotations.values(), scales.values(), GFS_MODEL_TRANSFORMS)
     b_positions = {k: v for k, v in zip(positions.keys(), b_positions)}
-    b_rotations = {k: v for k, v in zip(rotations.keys(), b_rotations)}
+    e_rotations = {k: v for k, v in zip(rotations.keys(), e_rotations)}
     b_scales    = {k: v for k, v in zip(scales   .keys(), b_scales   )}
-    
-    b_rotations = {k: v for k, v in zip(q_rotations.keys(), fix_quaternion_signs(list(q_rotations.values()), list(b_rotations.values())))}
-    if align_quats:
-        b_rotations = {k: v for k, v in zip(b_rotations.keys(), align_quaternion_signs(list(b_rotations.values())))}
-    
-    e_rotations = {k: v.to_euler() for k, v in b_rotations.items()}
-    
+
+    e_rotations = {k: v for k, v in zip(e_rotations.keys(), align_eulers(list(e_rotations.values())))}
+
     # Create animations
     # This typically takes up ~90% of execution time
     # create_fcurves(action,       actiongroup,       f'pose.bones["{bone_name}"].rotation_quaternion', "BEZIER", fps, b_rotations, [0, 1, 2, 3], fcurve_bank)

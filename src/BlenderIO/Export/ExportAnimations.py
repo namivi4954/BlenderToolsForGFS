@@ -9,6 +9,7 @@ from ...FileFormats.GFS.SubComponents.Animations.Binary.AnimationBinary import E
 from ..Globals import GFS_MODEL_TRANSFORMS
 from ..modelUtilsTest.Skeleton.Transform.Animation import bind_to_parent, bind_to_parent_blend
 from ..modelUtilsTest.Skeleton.Transform.Animation.Extract import synchronised_quat_bone_data_from_fcurves
+from ..modelUtilsTest.Skeleton.Transform.Animation.Extract import synchronised_euler_bone_data_from_fcurves
 from ..modelUtilsTest.Skeleton.Transform.Animation.Extract import synchronised_quat_object_transforms_from_fcurves
 from ..modelUtilsTest.Skeleton.Transform.Animation.Extract import extract_fcurves
 from ..modelUtilsTest.Skeleton.Transform.Animation import fix_quaternion_signs
@@ -80,7 +81,18 @@ def get_action_data(action, bpy_armature_obj, is_blend):
     out = []
 
     fcurves = extract_fcurves(action)
-    bone_fcurves = synchronised_quat_bone_data_from_fcurves(fcurves, bpy_armature_obj.pose.bones)
+    # Issue #157: Blend Animation rotations are raw, unpermuted Euler deltas,
+    # not proper rotations (see RotationBlend.py). Reconstructing a quaternion
+    # from them via the generic Euler->Quaternion composition used for Base
+    # Animations would silently recombine the three axis deltas into a single
+    # composed rotation and reintroduce the original bug on export, so Blend
+    # Animation rotations are kept as raw Euler samples here instead, and
+    # `bind_to_parent_rotation_blend_euler` performs the (permutation-aware)
+    # conversion back to a quaternion.
+    if is_blend:
+        bone_fcurves = synchronised_euler_bone_data_from_fcurves(fcurves)
+    else:
+        bone_fcurves = synchronised_quat_bone_data_from_fcurves(fcurves, bpy_armature_obj.pose.bones)
     obj_fcurves  = synchronised_quat_object_transforms_from_fcurves(fcurves, bpy_armature_obj)
     
     # print(fcurve_groups)
@@ -92,15 +104,21 @@ def get_action_data(action, bpy_armature_obj, is_blend):
         override_name = bpy_bone.GFSTOOLS_NodeProperties.override_name
         
         positions = bone_fcurves[bone_name].get("location", {})
-        rotations = bone_fcurves[bone_name].get("rotation_quaternion", {})
         scales    = bone_fcurves[bone_name].get("scale", {})
-        if is_blend: g_positions, g_rotations, g_scales = bind_to_parent_blend(bpy_bone, positions.values(), rotations.values(), scales.values(), GFS_MODEL_TRANSFORMS)
-        else:        g_positions, g_rotations, g_scales = bind_to_parent      (bpy_bone, positions.values(), rotations.values(), scales.values(), GFS_MODEL_TRANSFORMS)
-        g_positions = {k: v for k, v in zip(positions.keys(), g_positions)}
-        g_rotations = {k: q for k, q in zip(rotations.keys(), g_rotations)}
-        g_scales    = {k: v for k, v in zip(scales.keys(),    g_scales   )}
+        if is_blend:
+            rotations = bone_fcurves[bone_name].get("rotation_euler", {})
+            g_positions, g_rotations, g_scales = bind_to_parent_blend(bpy_bone, positions.values(), rotations.values(), scales.values(), GFS_MODEL_TRANSFORMS)
+            g_positions = {k: v for k, v in zip(positions.keys(), g_positions)}
+            g_rotations = {k: [q.x, q.y, q.z, q.w] for k, q in zip(rotations.keys(), g_rotations)}
+            g_scales    = {k: v for k, v in zip(scales.keys(),    g_scales   )}
+        else:
+            rotations = bone_fcurves[bone_name].get("rotation_quaternion", {})
+            g_positions, g_rotations, g_scales = bind_to_parent(bpy_bone, positions.values(), rotations.values(), scales.values(), GFS_MODEL_TRANSFORMS)
+            g_positions = {k: v for k, v in zip(positions.keys(), g_positions)}
+            g_rotations = {k: q for k, q in zip(rotations.keys(), g_rotations)}
+            g_scales    = {k: v for k, v in zip(scales.keys(),    g_scales   )}
 
-        g_rotations = {k: [q.x, q.y, q.z, q.w] for k, q in zip(rotations.keys(), fix_quaternion_signs([Quaternion(q) for q in rotations.values()], list(g_rotations.values())))}
+            g_rotations = {k: [q.x, q.y, q.z, q.w] for k, q in zip(rotations.keys(), fix_quaternion_signs([Quaternion(q) for q in rotations.values()], list(g_rotations.values())))}
         
         export_name = override_name if override_name != "" else bone_name
         fps = 30

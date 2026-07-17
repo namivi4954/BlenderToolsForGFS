@@ -1,6 +1,7 @@
 import re
 
 import numpy as np
+from mathutils import Euler
 from ....Misc.Maths import lerp, euler_to_quat
 
 BONE_PATTERN = re.compile("pose\.bones\[\"(.*)\"\].(.*)")
@@ -124,6 +125,25 @@ def synchronised_quat_bone_data_from_fcurves(fcurves_dict, bones):
                 data["rotation_quaternion"] = {k: euler_to_quat(e, rotation_mode).normalized() for k, e in data["rotation_euler"].items()}
         if 'rotation_euler' in data:
             del data['rotation_euler']
+    return bone_fcurves
+
+
+def synchronised_euler_bone_data_from_fcurves(fcurves_dict):
+    """
+    Like `synchronised_quat_bone_data_from_fcurves`, but for Blend Animation
+    export (Issue #157): Blend Animation rotations are raw, unpermuted Euler
+    deltas rather than proper rotations (see RotationBlend.py), so they must
+    *not* be converted to a quaternion here via a generic Euler->Quaternion
+    composition - that would silently recombine the three axis deltas into a
+    single composed rotation and reintroduce the original bug on export.
+    Instead, keep the raw `rotation_euler` samples as `Euler` objects and let
+    `bind_to_parent_rotation_blend_euler` perform the (permutation-aware)
+    conversion back to a quaternion.
+    """
+    bone_fcurves = synchronised_bone_data_from_fcurves(fcurves_dict)
+    for bn, data in bone_fcurves.items():
+        if 'rotation_euler' in data:
+            data['rotation_euler'] = {k: Euler(v) for k, v in data['rotation_euler'].items()}
     return bone_fcurves
 
 
