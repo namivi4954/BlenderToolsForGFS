@@ -10,6 +10,7 @@ from .ImportProperties import import_properties
 from ..Utils.Animation import gapnames_to_nlatrack
 from ..Utils.String import get_name_string
 from ..Utils.Serialization import pack_object
+from ..Utils.ActionCompat import get_channelbag, assign_action
 
 from ..Globals import GFS_MODEL_TRANSFORMS, BASE_ANIM_TYPE, BLEND_ANIM_TYPE, LOOKAT_ANIM_TYPE
 from ..modelUtilsTest.Skeleton.Transform.Animation import parent_to_bind, parent_to_bind_blend
@@ -125,12 +126,12 @@ def create_rest_pose(gfs, armature, gfs_to_bpy_bone_map):
         bone_name = armature.pose.bones[gfs_to_bpy_bone_map[node_idx]].name
         build_transformed_fcurves(action, armature, bone_name, 30, {0: node.position}, {0: node.rotation}, {0: node.scale}, {}, False)
     
-    armature.animation_data.action = action
+    assign_action(armature.animation_data, action, armature)
     track = armature.animation_data.nla_tracks.new()
     track.name = track_name
     track.mute = False
     track.strips.new(action.name, 1, action) # All actions imported to frame 1
-    armature.animation_data.action = None
+    assign_action(armature.animation_data, None)
     
     bpy.ops.object.mode_set(mode="OBJECT")
     bpy.context.view_layer.objects.active = prev_obj
@@ -139,7 +140,7 @@ def create_rest_pose(gfs, armature, gfs_to_bpy_bone_map):
 # PRIVATE UTILITIES #
 #####################
 
-def create_fcurves(action, actiongroup, fcurve_name, interpolation_method, fps, transforms, transform_indices, fcurve_bank):
+def create_fcurves(channelbag, actiongroup, fcurve_name, interpolation_method, fps, transforms, transform_indices, fcurve_bank):
     frames = transforms.keys()
     values = transforms.values()
     if len(frames) != 0:
@@ -147,11 +148,11 @@ def create_fcurves(action, actiongroup, fcurve_name, interpolation_method, fps, 
         for i, t_idx in enumerate(transform_indices):
             key = (fcurve_name, i)
             if key in fcurve_bank:
-                action.fcurves.remove(fcurve_bank[key])
+                channelbag.fcurves.remove(fcurve_bank[key])
             
-            # if fcurve_name in action.fcurves:
-            #     action.fcurves.remove(action.fcurves[fcurve_name])
-            fc = action.fcurves.new(fcurve_name, index=i)
+            # if fcurve_name in channelbag.fcurves:
+            #     channelbag.fcurves.remove(channelbag.fcurves[fcurve_name])
+            fc = channelbag.fcurves.new(fcurve_name, index=i)
             fc.keyframe_points.add(count=len(frames))
             fc.keyframe_points.foreach_set("co",
                                            [x for co in zip([float(fps*frame + 1) for frame in frames],
@@ -171,15 +172,16 @@ def create_fcurves(action, actiongroup, fcurve_name, interpolation_method, fps, 
 
 def build_object_fcurves(action, object, fps, positions, rotations, scales):
     # Set up action data
-    actiongroup = action.groups.new("Object Transforms")
+    channelbag = get_channelbag(action, object)
+    actiongroup = channelbag.groups.new("Object Transforms")
 
     # Create animations
     q_rotations = {k: Quaternion([q[3], q[0], q[1], q[2]]) for k, q in rotations  .items()}
     e_rotations = {k: q.to_euler()                         for k, q in q_rotations.items()}
-    create_fcurves(action, actiongroup, 'rotation_quaternion', "BEZIER", fps, q_rotations, [0, 1, 2, 3], {})
-    create_fcurves(action, actiongroup, 'rotation_euler',      "LINEAR", fps, e_rotations, [0, 1, 2]   , {})
-    create_fcurves(action, actiongroup, 'location',            "LINEAR", fps, positions,   [0, 1, 2]   , {})
-    create_fcurves(action, actiongroup, 'scale',               "LINEAR", fps, scales,      [0, 1, 2]   , {})
+    create_fcurves(channelbag, actiongroup, 'rotation_quaternion', "BEZIER", fps, q_rotations, [0, 1, 2, 3], {})
+    create_fcurves(channelbag, actiongroup, 'rotation_euler',      "LINEAR", fps, e_rotations, [0, 1, 2]   , {})
+    create_fcurves(channelbag, actiongroup, 'location',            "LINEAR", fps, positions,   [0, 1, 2]   , {})
+    create_fcurves(channelbag, actiongroup, 'scale',               "LINEAR", fps, scales,      [0, 1, 2]   , {})
 
 
 def quaternion_to_euler(q):
@@ -202,7 +204,8 @@ def quaternion_to_euler(q):
 
 def build_transformed_fcurves(action, armature, bone_name, fps, positions, rotations, scales, fcurve_bank, align_quats):
     # Set up action data
-    actiongroup = action.groups.new(bone_name)
+    channelbag = get_channelbag(action, armature)
+    actiongroup = channelbag.groups.new(bone_name)
     
     # Get the matrices required to convert animations from GFS -> Blender
     bpy_bone = armature.data.bones[bone_name]
@@ -224,15 +227,16 @@ def build_transformed_fcurves(action, armature, bone_name, fps, positions, rotat
     
     # Create animations
     # This typically takes up ~90% of execution time
-    # create_fcurves(action, actiongroup, f'pose.bones["{bone_name}"].rotation_quaternion', "BEZIER", fps, b_rotations, [0, 1, 2, 3], fcurve_bank)
-    create_fcurves(action, actiongroup, f'pose.bones["{bone_name}"].rotation_euler',      "LINEAR", fps, e_rotations, [0, 1, 2]   , fcurve_bank)
-    create_fcurves(action, actiongroup, f'pose.bones["{bone_name}"].location',            "LINEAR", fps, b_positions, [0, 1, 2]   , fcurve_bank)
-    create_fcurves(action, actiongroup, f'pose.bones["{bone_name}"].scale',               "LINEAR", fps, b_scales,    [0, 1, 2]   , fcurve_bank)
+    # create_fcurves(channelbag, actiongroup, f'pose.bones["{bone_name}"].rotation_quaternion', "BEZIER", fps, b_rotations, [0, 1, 2, 3], fcurve_bank)
+    create_fcurves(channelbag, actiongroup, f'pose.bones["{bone_name}"].rotation_euler',      "LINEAR", fps, e_rotations, [0, 1, 2]   , fcurve_bank)
+    create_fcurves(channelbag, actiongroup, f'pose.bones["{bone_name}"].location',            "LINEAR", fps, b_positions, [0, 1, 2]   , fcurve_bank)
+    create_fcurves(channelbag, actiongroup, f'pose.bones["{bone_name}"].scale',               "LINEAR", fps, b_scales,    [0, 1, 2]   , fcurve_bank)
 
 
 def build_blend_fcurves(action, armature, bone_name, fps, positions, rotations, scales, fcurve_bank, align_quats):
     # Set up action data
-    actiongroup       = action      .groups.new(bone_name)
+    channelbag  = get_channelbag(action, armature)
+    actiongroup = channelbag.groups.new(bone_name)
 
     # Get the matrices required to convert animations from GFS -> Blender
     bpy_bone = armature.data.bones[bone_name]
@@ -256,10 +260,10 @@ def build_blend_fcurves(action, armature, bone_name, fps, positions, rotations, 
 
     # Create animations
     # This typically takes up ~90% of execution time
-    # create_fcurves(action,       actiongroup,       f'pose.bones["{bone_name}"].rotation_quaternion', "BEZIER", fps, b_rotations, [0, 1, 2, 3], fcurve_bank)
-    create_fcurves(action, actiongroup, f'pose.bones["{bone_name}"].rotation_euler', "LINEAR", fps, e_rotations, [0, 1, 2]   , fcurve_bank)
-    create_fcurves(action, actiongroup, f'pose.bones["{bone_name}"].location',       "LINEAR", fps, b_positions, [0, 1, 2]   , fcurve_bank)
-    create_fcurves(action, actiongroup, f'pose.bones["{bone_name}"].scale',          "LINEAR", fps, b_scales,    [0, 1, 2]   , fcurve_bank)
+    # create_fcurves(channelbag,       actiongroup,       f'pose.bones["{bone_name}"].rotation_quaternion', "BEZIER", fps, b_rotations, [0, 1, 2, 3], fcurve_bank)
+    create_fcurves(channelbag, actiongroup, f'pose.bones["{bone_name}"].rotation_euler', "LINEAR", fps, e_rotations, [0, 1, 2]   , fcurve_bank)
+    create_fcurves(channelbag, actiongroup, f'pose.bones["{bone_name}"].location',       "LINEAR", fps, b_positions, [0, 1, 2]   , fcurve_bank)
+    create_fcurves(channelbag, actiongroup, f'pose.bones["{bone_name}"].scale',          "LINEAR", fps, b_scales,    [0, 1, 2]   , fcurve_bank)
 
 
 def prop_anim_from_gfs_anim(ap_props, gap_name, anim_type, anim_name, gfs_anim, bpy_armature_obj, is_blend, import_policies, errorlog, version, gfs_to_bpy_bone_map=None):

@@ -1,5 +1,6 @@
 from mathutils import Matrix
 from .Maths import convert_rotation_to_quaternion
+from .ActionCompat import get_channelbag
 
 
 def get_rest_pose(bpy_armature_object):
@@ -32,12 +33,16 @@ def create_anim_init_data():
             'scale':               [1., 1., 1.],
             'rotation_euler':      [0., 0., 0.]}
 
-def group_fcurves_by_bone_and_type(action):
+def group_fcurves_by_bone_and_type(action, armature_object):
     res = {}
     possible_transforms = set(create_anim_init_data().keys())
     obj_transforms = None
     
-    for fcurve in action.fcurves:
+    channelbag = get_channelbag(action, armature_object, create=False)
+    if channelbag is None:
+        return res, obj_transforms
+    
+    for fcurve in channelbag.fcurves:
         # Bone transform
         if fcurve.data_path[:10] == 'pose.bones':
             bone_name = get_bone_name_from_fcurve(fcurve)
@@ -88,7 +93,7 @@ def create_pose_matrix(pose_curves, pose_object):
 
 def extract_first_frame(action, armature_object, pose_bones):
     out = {}
-    extracted_fcurve_data, extracted_root_fcurve_data = group_fcurves_by_bone_and_type(action)
+    extracted_fcurve_data, extracted_root_fcurve_data = group_fcurves_by_bone_and_type(action, armature_object)
     for pose_bone in pose_bones:
         pose_curves = extracted_fcurve_data.get(pose_bone.name)
         if pose_curves is None:

@@ -1,6 +1,6 @@
 # Fork notes
 
-This fork exists to fix a particular issue around importing facial animations since the upstream repo seems inactive. I'm also trying my hand at making this plugin work for Blender 5+. I don't intend to develop this fork any further than that, though. All credit belongs to the upstream repo as I'm just making tiny changes off of all their incredible work.
+This fork exists to try to fix a particular issue around importing facial animations since the upstream repo seems inactive. I'm also trying my hand at making this plugin work for Blender 5+. I don't intend to develop this fork any further than that, though. All credit belongs to the upstream repo as I'm just making tiny changes off of all their incredible work.
 
 # BlenderToolsForGFS
 A Blender 2.81+ plugin for importing and exporting GFS and GAP files.

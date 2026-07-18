@@ -80,7 +80,7 @@ def get_action_data(action, bpy_armature_obj, is_blend):
     bone_names = [b.name for b in bpy_armature_obj.data.bones]
     out = []
 
-    fcurves = extract_fcurves(action)
+    fcurves = extract_fcurves(action, bpy_armature_obj)
     # Issue #157: Blend Animation rotations are raw, unpermuted Euler deltas,
     # not proper rotations (see RotationBlend.py). Reconstructing a quaternion
     # from them via the generic Euler->Quaternion composition used for Base

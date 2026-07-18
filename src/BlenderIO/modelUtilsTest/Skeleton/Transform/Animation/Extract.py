@@ -3,18 +3,22 @@ import re
 import numpy as np
 from mathutils import Euler
 from ....Misc.Maths import lerp, euler_to_quat
+from .....Utils.ActionCompat import get_channelbag
 
 BONE_PATTERN = re.compile("pose\.bones\[\"(.*)\"\].(.*)")
 
 #############
 # INTERFACE #
 #############
-def extract_fcurves(action):
+def extract_fcurves(action, id_data):
     """
     Returns a dictionary of all fcurves from an action, grouped by datapath.
     """
     res = {}
-    for fcurve in action.fcurves:
+    channelbag = get_channelbag(action, id_data, create=False)
+    if channelbag is None:
+        return res
+    for fcurve in channelbag.fcurves:
         data_path = fcurve.data_path
         if data_path not in res:
             res[data_path] = {}
