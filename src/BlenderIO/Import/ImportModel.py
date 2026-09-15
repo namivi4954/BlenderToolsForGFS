@@ -683,13 +683,16 @@ def set_material(bpy_mesh_object, gfs_mesh, materials, material_vertex_attribute
                         if uv_map_name in bpy_mesh.uv_layers:
                             uv_map = bpy_mesh.uv_layers[uv_map_name]
                         else:
-                            errorlog.log_warning_message(f"Mesh '{bpy_mesh_object.name}' uses material '{active_material.name}', which uses UV map '{uv_map_name}' for the normal texture but this UV map is not present on the mesh - falling back to the active UV map to calculate vertex tangents.")
+                            pass
+                            #errorlog.log_warning_message(f"Mesh '{bpy_mesh_object.name}' uses material '{active_material.name}', which uses UV map '{uv_map_name}' for the normal texture but this UV map is not present on the mesh - falling back to the active UV map to calculate vertex tangents.")
                     else:
-                        errorlog.log_warning_message(f"Mesh '{bpy_mesh_object.name}' has tangent vectors, but no normal map - using the default UV map to calculate tangent vectors.")
+                        pass
+                        #errorlog.log_warning_message(f"Mesh '{bpy_mesh_object.name}' has tangent vectors, but no normal map - using the default UV map to calculate tangent vectors.")
                     
                     bpy_mesh.calc_tangents(uvmap=uv_map.name)
                 else:
-                    errorlog.log_warning_message(f"Mesh '{bpy_mesh_object.name}' has tangents but no UV layers - tangents cannot be imported to Blender.")
+                    #errorlog.log_warning_message(f"Mesh '{bpy_mesh_object.name}' has tangents but no UV layers - tangents cannot be imported to Blender.")
+                    pass
 
 
 def import_camera(name, i, camera, armature, bpy_node_names):
