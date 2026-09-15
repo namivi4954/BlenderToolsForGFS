@@ -98,7 +98,12 @@ def import_animations(gfs, bpy_armature_object, filename, is_external, import_po
     if not is_external:
         mprops.internal_animation_pack_idx = len(mprops.animation_packs) - 1
     mprops.active_animation_pack_idx = len(mprops.animation_packs) - 1
-    
+
+    # Activate the newly-imported GAP by default, pushing its animations
+    # into the NLA so it shows up as "checked" in the GAP list.
+    ap_props.add_to_nla(bpy_armature_object)
+    ap_props.is_active = True
+
     ap_props.store_animation_pack(bpy_armature_object)
 
 

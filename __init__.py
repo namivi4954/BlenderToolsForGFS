@@ -4,13 +4,11 @@ from .src.FileFormats.GFS import EPLFileBinary
 bl_info = {
         "name": "GFS Import/Export (.GMD/.GAP/.GFS)",
         "description": "Imports GFS files.",
-        "author": "Pherakki",
+        "author": "namivi4954 ",
         "version": (0, 3, 1),
-        "blender": (2, 81, 0),
+        "blender": (5, 0, 0),
         "location": "File > Import, File > Export",
         "warning": "",
-        #"wiki_url": "https://github.com/Pherakki/BlenderToolsforGFS",
-        #"tracker_url": "https://github.com/Pherakki/BlenderToolsforGFS/issues",
         "category": "Import-Export",
         }
 
